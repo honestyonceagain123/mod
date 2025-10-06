@@ -1,0 +1,391 @@
+import React, { Component } from "react";
+import Result from "./Result";
+import Keypad from "./keypad";
+
+// Universal custom percentage mapping function with realistic decimals
+function adjustPercentage(num) {
+  const percent = parseFloat(num);
+  const randomDecimal = () => Math.random().toString().substring(1, 12); // random decimal part
+
+  // 🔹 Newly added mappings
+  if (percent >= 70 && percent < 72) return parseFloat("80" + randomDecimal());
+  if (percent >= 72 && percent < 74) return parseFloat("82" + randomDecimal());
+  if (percent >= 74 && percent < 76) return parseFloat("85" + randomDecimal());
+
+  // 🔹 Existing modded mapping + realistic decimals
+  if (percent >= 75 && percent < 77) return parseFloat("80" + randomDecimal());
+  if (percent >= 77 && percent < 79) return parseFloat("85" + randomDecimal());
+  if (percent >= 79 && percent < 81) return parseFloat("86" + randomDecimal());
+  if (percent >= 81 && percent < 83) return parseFloat("88" + randomDecimal());
+  if (percent >= 83 && percent < 84) return parseFloat("89" + randomDecimal());
+  if (percent >= 84 && percent < 86) return parseFloat("90" + randomDecimal());
+  if (percent >= 86 && percent < 88) return parseFloat("91" + randomDecimal());
+  if (percent >= 88 && percent < 90) return parseFloat("92" + randomDecimal());
+  if (percent >= 90) return parseFloat("94" + randomDecimal());
+
+  return Math.round(percent * 100) / 100; // others normal rounded
+}
+
+
+class CalculatorSection extends Component {
+  state = {
+    result: "0",
+    expression: ["0"],
+    isEqualClicked: false,
+    isSpanActive: false,
+    isOperatorActive: false,
+  };
+
+  handleEqual = () => {
+    const check =
+      this.state.result === "0" && this.state.expression.join(" ") === "0";
+    if (!check && !this.state.isEqualClicked) {
+      this.setState({ isEqualClicked: true }, this.storePreviousResult);
+      this.active_result();
+    }
+  };
+
+  handleAllClear = () => {
+    if (this.state.expression.join("") !== "0") {
+      this.reset();
+    } else {
+      this.deleteHistory();
+    }
+  };
+
+  handleBackspace = () => {
+    if (this.state.isSpanActive) {
+      this.handleSpanBackSpace();
+    } else {
+      this.backspace();
+    }
+  };
+
+  handleOperator = (val, checkSigns) => {
+    if (this.state.isOperatorActive || this.state.isSpanActive) {
+      this.handleSpanChanges(val);
+    } else {
+      let textArray = [...this.state.expression];
+      const last_val = textArray[textArray.length - 1];
+      if (checkSigns.test(last_val)) {
+        this.replaceSign(val, textArray);
+      } else {
+        if (this.state.isEqualClicked) {
+          this.handleEqualActive(val);
+        } else {
+          textArray.push(val);
+          this.setState({
+            expression: textArray,
+          });
+        }
+      }
+    }
+  };
+
+  handleEqualActive = (val) => {
+    if (this.state.result === "Can't divide by 0") {
+      let newArr = ["0", val];
+      this.setState(
+        {
+          expression: newArr,
+          result: "0",
+          isEqualClicked: false,
+        },
+        this.active_exp
+      );
+    } else {
+      let newArr = [this.state.result];
+      newArr.push(val);
+      this.setState(
+        {
+          expression: newArr,
+          isEqualClicked: false,
+        },
+        this.active_exp
+      );
+    }
+  };
+
+  replaceSign = (val, textArray) => {
+    textArray.pop();
+    textArray.push(val);
+    this.setState({
+      expression: textArray,
+    });
+    if (this.state.isEqualClicked) {
+      this.setState({ isEqualClicked: false }, this.active_exp);
+    }
+  };
+
+  onClick = (val) => {
+    const checkSigns = /(\+|-|\*|\/|%)/i;
+    if (val === "=") {
+      this.handleEqual();
+    } else if (val === "Ac") {
+      this.handleAllClear();
+    } else if (val === "backspace") {
+      this.handleBackspace();
+    } else if (checkSigns.test(val)) {
+      this.handleOperator(val, checkSigns);
+    } else {
+      if (this.state.isEqualClicked) {
+        if (val === ".") {
+          this.setState(
+            {
+              expression: ["0."],
+              isEqualClicked: false,
+            },
+            this.calculate
+          );
+        } else {
+          this.setState(
+            {
+              expression: [val],
+              isEqualClicked: false,
+            },
+            this.calculate
+          );
+        }
+        this.active_exp();
+      } else {
+        if (this.state.isOperatorActive || this.state.isSpanActive)
+          this.handleSpanChanges(val);
+        else this.handleDigits(val);
+      }
+    }
+  };
+
+  storePreviousResult = () => {
+    const prevExp = { exp: this.state.expression, value: this.state.result };
+    if (localStorage.getItem("history")) {
+      let expression = JSON.parse(localStorage.getItem("history"));
+      expression.push(prevExp);
+      window.localStorage.setItem("history", JSON.stringify(expression));
+    } else {
+      window.localStorage.setItem("history", JSON.stringify([prevExp]));
+    }
+  };
+
+  deleteHistory = () => {
+    if (localStorage.getItem("history")) {
+      let history = JSON.parse(localStorage.getItem("history"));
+      if (history.length > 0) {
+        const { exp, value } = history[history.length - 1];
+        this.setState({
+          expression: exp,
+          result: value,
+        });
+        history.pop();
+        window.localStorage.setItem("history", JSON.stringify(history));
+      }
+    }
+  };
+
+  handleDigits = (val) => {
+    let current;
+    let textArray = [...this.state.expression];
+    if (textArray.length >= 1) {
+      current = textArray[textArray.length - 1];
+      const regexp = /\d|\.+/g;
+      if (regexp.test(current)) {
+        if (val === ".") {
+          if (current === "0") {
+            current = "0.";
+          } else if (current.indexOf(".") === -1) {
+            current += val;
+          }
+        } else if (current === "0") {
+          current = val;
+        } else if (current.length < 15) {
+          current += val;
+        }
+        textArray.pop();
+        textArray.push(current);
+        this.setState(
+          {
+            expression: textArray,
+            isEqualClicked: false,
+          },
+          this.calculate
+        );
+      } else {
+        const checkSigns = /(\+|-|\*|\/)/i;
+        if (val === "." && checkSigns.test(current)) {
+          val = "0.";
+        }
+        textArray.push(val);
+        this.setState(
+          {
+            expression: textArray,
+            isEqualClicked: false,
+          },
+          this.calculate
+        );
+      }
+    }
+  };
+
+  handleSpanChanges = (val) => {
+    const activeSpan = document.querySelector(".active-exp-span");
+    let expression = [...this.state.expression];
+    const checkSigns = /(\+|-|\*|\/|%)/i;
+    if (checkSigns.test(val) || expression[activeSpan.id] === "0") {
+      expression[activeSpan.id] = val;
+      this.setState({ expression }, this.calculate);
+    } else if (expression[activeSpan.id].length < 15) {
+      expression[activeSpan.id] += val;
+      this.setState({ expression }, this.calculate);
+    }
+  };
+
+  handleSpanBackSpace = () => {
+    const activeSpan = document.querySelector(".active-exp-span");
+    let expression = [...this.state.expression];
+    let current = expression[activeSpan.id];
+    if (current.length > 1) {
+      expression[activeSpan.id] = current.slice(0, -1);
+      this.setState({ expression }, this.calculate);
+    } else {
+      expression[activeSpan.id] = "0";
+      this.setState({ expression }, this.calculate);
+    }
+  };
+
+  calculate = () => {
+    try {
+      let exp = [...this.state.expression];
+      const last = exp[exp.length - 1];
+      const checkSigns = /(\+|-|\*|\/|%)/i;
+      if (checkSigns.test(last)) exp.pop();
+      if (last === ".") {
+        exp.pop();
+        exp.push("0.");
+      }
+
+      const tocalculate = exp.join("");
+      let result = eval(tocalculate);
+
+      if (!isFinite(result)) {
+        result = "Can't divide by 0";
+      } else {
+        // Convert to percentage if fraction
+        if (result <= 1 && !tocalculate.includes("*100")) {
+          result = result * 100;
+        }
+        result = adjustPercentage(result);
+      }
+
+      this.setState({ result });
+    } catch (e) {
+      console.log(e);
+    }
+  };
+
+  active_exp = () => {
+    const expression = document.querySelector(".expression");
+    const result_element = document.querySelector(".active-result");
+    if (expression !== result_element) {
+      expression.classList.add("active-result");
+      result_element.classList.remove("active-result");
+    }
+  };
+
+  active_result = () => {
+    const expression = document.querySelector(".active-result");
+    const result_element = document.querySelector(".result");
+    if (expression !== result_element) {
+      expression.classList.remove("active-result");
+      result_element.classList.add("active-result");
+    }
+  };
+
+  reset = () => {
+    this.setState(
+      {
+        result: "0",
+        expression: ["0"],
+      },
+      this.active_exp
+    );
+  };
+
+  backspace = () => {
+    if (this.state.isEqualClicked) {
+      this.setState({ isEqualClicked: false }, this.active_exp);
+    }
+    const exp = [...this.state.expression];
+    if (exp.length >= 1) {
+      const last = exp[exp.length - 1];
+      if (last.length > 1) {
+        const newArr = [...exp];
+        newArr.pop();
+        newArr.push(last.slice(0, -1));
+        this.setState(
+          {
+            expression: newArr,
+          },
+          this.calculate
+        );
+      } else if (exp.length === 1 && last.length === 1) {
+        this.setState({
+          expression: ["0"],
+          result: "0",
+        });
+      } else {
+        const newArr = [...exp];
+        newArr.pop();
+        this.setState(
+          {
+            expression: newArr,
+          },
+          this.calculate
+        );
+      }
+    }
+  };
+
+  toggleisActiveSpan = () => {
+    this.setState({
+      isSpanActive: false,
+      isOperatorActive: false,
+    });
+    const activeSpan = document.querySelector(".active-exp-span");
+    activeSpan && activeSpan.classList.remove("active-exp-span");
+  };
+
+  onSpanClick = (event) => {
+    if (this.state.isEqualClicked) {
+      this.active_exp();
+      this.setState({ isEqualClicked: false });
+    }
+    const activeSpan = document.querySelector(".active-exp-span");
+    activeSpan && activeSpan.classList.remove("active-exp-span");
+    event.target.classList.add("active-exp-span");
+
+    if (isNaN(event.target.innerText)) {
+      this.setState({ isOperatorActive: true, isSpanActive: false });
+    } else {
+      this.setState({ isSpanActive: true, isOperatorActive: false });
+    }
+  };
+
+  render() {
+    return (
+      <div className="container">
+        <Result
+          result={this.state.result}
+          expression={this.state.expression}
+          onSpanClick={this.onSpanClick}
+        />
+        <Keypad
+          onClick={this.onClick}
+          isSpanActive={this.state.isSpanActive}
+          isOperatorActive={this.state.isOperatorActive}
+          toggleisActiveSpan={this.toggleisActiveSpan}
+        />
+      </div>
+    );
+  }
+}
+
+export default CalculatorSection;
